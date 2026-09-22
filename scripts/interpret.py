@@ -357,7 +357,7 @@ def read_funding(s, coin="BTC"):
 
 def read_oi(s, price: float, coin="BTC"):
     v = last(s)
-    usd = v * price / 1e9
+    usd = v / 1e9 if s.get("unit") == "usd" else v * price / 1e9
     ch = pct_change_over(s, 30)
     if ch is None:
         return read(usd, "info", f"{coin} open interest ≈ ${_fmt(usd, 1)}B.")

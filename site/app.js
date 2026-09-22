@@ -322,6 +322,10 @@ function getSeries(spec) {
     : (doc.series || {})[spec.k];
   if (!node || !node.dates || !node.dates.length) return null;
   if (spec.toUSDB && DATA.crypto) {
+    if (node.unit === "usd") {
+      return { dates: node.dates, values: node.values.map(v => v / 1e9),
+               source: node.source };
+    }
     const px = DATA.crypto.series.btc_price;
     const vals = node.dates.map((d, i) => {
       const p = asof(px, d); return p ? node.values[i] * p / 1e9 : null;

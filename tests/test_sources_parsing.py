@@ -97,6 +97,29 @@ class TestFunding(unittest.TestCase):
         self.assertEqual(out["source"], "test")
 
 
+class TestOpenInterest(unittest.TestCase):
+    def test_okx_primary_returns_usd_unit(self):
+        payload = {"code": "0", "data": [
+            ["1704153600000", "3200000000", "999"],
+            ["1704067200000", "3100000000", "999"]]}
+        with patch.object(S, "get_json", return_value=payload):
+            out = S.open_interest_history("BTC")
+        self.assertEqual(out["unit"], "usd")
+        self.assertEqual(out["source"], "okx")
+        self.assertEqual(out["dates"], ["2024-01-01", "2024-01-02"])
+        self.assertEqual(out["values"], [3.1e9, 3.2e9])
+
+    def test_oi_read_handles_both_units(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+        import interpret as I
+        usd = {"dates": ["2024-01-01", "2024-02-01"], "values": [3.0e9, 3.3e9], "unit": "usd"}
+        base = {"dates": ["2024-01-01", "2024-02-01"], "values": [50000.0, 55000.0]}
+        r_usd = I.read_oi(usd, price=100_000.0)
+        r_base = I.read_oi(base, price=100_000.0)
+        self.assertAlmostEqual(r_usd["value"], 3.3)   # $3.3B
+        self.assertAlmostEqual(r_base["value"], 5.5)  # 55k BTC × $100k = $5.5B
+
+
 class TestNews(unittest.TestCase):
     def test_rss_parse_and_per_feed_isolation(self):
         rss = (b"<?xml version='1.0'?><rss><channel>"

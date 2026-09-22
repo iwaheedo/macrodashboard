@@ -343,8 +343,23 @@ def _funding_daily(pts: list[tuple[int, float]], source: str) -> dict:
 
 
 def open_interest_history(coin: str) -> dict:
-    """Daily open interest in base units. Bybit → Binance."""
+    """Daily open interest. OKX (USD, US-accessible) → Bybit → Binance (base units).
+
+    The result carries "unit": "usd" or "base" — consumers must check it.
+    """
     errors = []
+    try:
+        j = get_json("https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-volume"
+                     f"?ccy={coin}&period=1D")
+        pts = sorted((int(r[0]), float(r[1])) for r in j["data"])
+        if pts:
+            d = [datetime.fromtimestamp(t / 1000, tz=timezone.utc).date().isoformat() for t, _ in pts]
+            s = series(d, [v for _, v in pts])
+            s["source"] = "okx"
+            s["unit"] = "usd"
+            return s
+    except Exception as e:
+        errors.append(f"okx: {e}")
     try:
         rows = []
         cursor = ""
@@ -362,6 +377,7 @@ def open_interest_history(coin: str) -> dict:
             d = [datetime.fromtimestamp(t / 1000, tz=timezone.utc).date().isoformat() for t, _ in pts]
             s = series(d, [v for _, v in pts])
             s["source"] = "bybit"
+            s["unit"] = "base"
             return s
     except Exception as e:
         errors.append(f"bybit: {e}")
@@ -373,6 +389,7 @@ def open_interest_history(coin: str) -> dict:
             d = [datetime.fromtimestamp(t / 1000, tz=timezone.utc).date().isoformat() for t, _ in pts]
             s = series(d, [v for _, v in pts])
             s["source"] = "binance"
+            s["unit"] = "base"
             return s
     except Exception as e:
         errors.append(f"binance: {e}")

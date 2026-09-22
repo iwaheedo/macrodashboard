@@ -246,23 +246,26 @@ def _fetch_or_salvage(fetch, prev: dict, key: str, label: str) -> dict:
 
 def build_derivs() -> dict:
     out = {"fetched_at": now_iso(), "funding": {}, "open_interest": {}, "long_short": {}}
+    prev = _load("derivs.json") or {}
     ok = False
-    for coin in ("BTC", "ETH"):
+
+    def attempt(group: str, key: str, fetch):
+        nonlocal ok
         try:
-            out["funding"][coin.lower()] = S.funding_history(coin)
+            out[group][key] = fetch()
             ok = True
+            return
         except Exception as e:
-            print(f"  note: funding {coin} unavailable ({e})")
-    try:
-        out["open_interest"]["btc"] = S.open_interest_history("BTC")
-        ok = True
-    except Exception as e:
-        print(f"  note: open interest unavailable ({e})")
-    try:
-        out["long_short"]["btc"] = S.long_short_ratio("BTC")
-        ok = True
-    except Exception as e:
-        print(f"  note: long/short unavailable ({e})")
+            print(f"  note: {group}/{key} unavailable ({e})")
+        old = (prev.get(group) or {}).get(key)
+        if old and old.get("values"):
+            print(f"  note: {group}/{key} reusing previous data (last obs {old['dates'][-1]})")
+            out[group][key] = old
+
+    attempt("funding", "btc", lambda: S.funding_history("BTC"))
+    attempt("funding", "eth", lambda: S.funding_history("ETH"))
+    attempt("open_interest", "btc", lambda: S.open_interest_history("BTC"))
+    attempt("long_short", "btc", lambda: S.long_short_ratio("BTC"))
     if not ok:
         raise S.FetchError("every derivatives endpoint failed")
     return out
