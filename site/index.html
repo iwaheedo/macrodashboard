@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waypoint — Macro &amp; Crypto, Interpreted</title>
+<meta name="description" content="A macro and crypto dashboard that explains itself: liquidity, rates, risk assets and Bitcoin cycle gauges — each chart with a plain-English read on what it means.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%238A5731'/><path d='M28 72 V48 M50 72 V28 M72 72 V38' stroke='white' stroke-width='10' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><span class="brand-mark"></span>Waypoint</a>
+    <div class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#liquidity">Liquidity</a>
+      <a href="#rates">Rates &amp; Dollar</a>
+      <a href="#assets">Risk Assets</a>
+      <a href="#crypto">Crypto</a>
+      <a href="#derivs">Leverage</a>
+      <a href="#week">This Week</a>
+      <a href="#method">Method</a>
+    </div>
+    <div class="nav-status" id="nav-status">
+      <span class="status-dot" id="status-dot"></span><span id="status-text">Loading…</span>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap" id="top">
+  <p class="eyebrow">Macro &amp; Crypto, Interpreted</p>
+  <h1>Where we are in the cycle,<br>in plain English.</h1>
+  <p class="sub">Liquidity, rates, risk assets and Bitcoin — every chart on this page tells you
+     what you're looking at, what a move means, and what it reads like <em>right now</em>.
+     Built on free public data, refreshed automatically.</p>
+</header>
+
+<main>
+  <section class="section wrap" id="overview" style="padding-top: 8px;">
+    <div class="regime" id="regime-card"></div>
+    <div class="gauges" id="gauges"></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section class="section wrap" id="liquidity">
+    <div class="section-head">
+      <h2>Liquidity &amp; Central Banks</h2>
+      <p id="intro-liquidity"></p>
+    </div>
+    <div class="grid" id="grid-liquidity"></div>
+  </section>
+
+  <section class="section wrap" id="rates">
+    <div class="section-head">
+      <h2>Rates, Credit &amp; the Dollar</h2>
+      <p id="intro-rates"></p>
+    </div>
+    <div class="grid" id="grid-rates"></div>
+  </section>
+
+  <section class="section wrap" id="assets">
+    <div class="section-head">
+      <h2>Risk Assets</h2>
+      <p id="intro-assets"></p>
+    </div>
+    <div class="grid" id="grid-assets"></div>
+  </section>
+
+  <section class="section wrap" id="crypto">
+    <div class="section-head">
+      <h2>Bitcoin &amp; Crypto</h2>
+      <p id="intro-crypto"></p>
+    </div>
+    <div class="grid" id="grid-crypto"></div>
+  </section>
+
+  <section class="section wrap" id="derivs">
+    <div class="section-head">
+      <h2>Leverage &amp; Positioning</h2>
+      <p id="intro-derivs"></p>
+    </div>
+    <div class="grid" id="grid-derivs"></div>
+  </section>
+
+  <section class="section wrap" id="week">
+    <div class="section-head">
+      <h2>This Week</h2>
+      <p id="intro-week"></p>
+    </div>
+    <div class="grid" id="grid-week"></div>
+  </section>
+
+  <section class="section wrap" id="method">
+    <div class="section-head">
+      <h2>How to read this page</h2>
+      <p>No black boxes: every gauge is a documented average of public data. Signals describe
+         historical patterns, not predictions.</p>
+    </div>
+    <div class="grid" id="grid-method"></div>
+    <div class="disclaimer" style="margin-top: 20px;">
+      <strong>Educational tool, not financial advice.</strong> Everything on this page describes
+      historical relationships in public market data. Nothing here is a recommendation to buy or
+      sell anything, and past patterns regularly fail. Data comes from free public sources
+      (FRED, blockchain.com, bitcoin-data.com, Coinbase, CoinGecko, DefiLlama, alternative.me,
+      OKX/Bybit/Binance, ForexFactory, public RSS feeds) and can be delayed or wrong.
+      Do your own research and size positions like the future is uncertain — because it is.
+    </div>
+  </section>
+</main>
+
+<footer class="footer wrap">
+  <div>Waypoint · an open, self-updating dashboard · <a id="repo-link" href="#" target="_blank" rel="noopener">source &amp; docs</a></div>
+  <div class="foot-status" id="foot-status"></div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+<script src="explainers.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
