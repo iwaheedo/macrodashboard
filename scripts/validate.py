@@ -139,6 +139,31 @@ def validate() -> Problems:
         problems.check(len(newscal.get("news", [])) >= 5,
                        f"newscal.json: only {len(newscal.get('news', []))} news items")
 
+    war = _load("war.json", problems)
+    if war:
+        b = war.get("brent", {})
+        problems.check(bool(b.get("values")), "war.json: brent missing")
+        if b.get("values"):
+            problems.check(15.0 <= b["values"][-1] <= 400.0,
+                           f"war.json: brent implausible ({b['values'][-1]})")
+            problems.check(_staleness_days(b["dates"][-1]) <= 8, "war.json: brent stale")
+        cps = war.get("chokepoints", {})
+        for key in ("hormuz", "bab_el_mandeb", "suez"):
+            cp = cps.get(key)
+            if not cp or not cp.get("dates"):
+                problems.append(f"war.json: chokepoint {key} missing")
+                continue
+            problems.check(_staleness_days(cp["dates"][-1]) <= 8,
+                           f"war.json: {key} flows stale (last {cp['dates'][-1]})")
+            problems.check(len(cp["dates"]) == len(cp["tankers"]),
+                           f"war.json: {key} length mismatch")
+            problems.check(all(0 <= v <= 200 for v in cp["tankers"][-30:]),
+                           f"war.json: {key} implausible tanker counts")
+        div = war.get("divergence", {})
+        problems.check(div.get("state") in ("disruption_underpriced", "disruption_priced",
+                                            "premium_no_disruption", "aligned", "unknown"),
+                       f"war.json: bad divergence state '{div.get('state')}'")
+
     meta = _load("meta.json", problems)
     if meta:
         gen = meta.get("generated_at", "1970-01-01")

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>War Risk — Waypoint</title>
+<meta name="description" content="Conflict theaters, their market transmission channels, and a physical-flows-vs-price tracker for the world's oil chokepoints.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%238A5731'/><path d='M28 72 V48 M50 72 V28 M72 72 V38' stroke='white' stroke-width='10' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="index.html"><span class="brand-mark"></span>Waypoint</a>
+    <div class="nav-links">
+      <a href="index.html#overview">Overview</a>
+      <a href="index.html#liquidity">Liquidity</a>
+      <a href="index.html#rates">Rates &amp; Dollar</a>
+      <a href="index.html#assets">Risk Assets</a>
+      <a href="index.html#crypto">Crypto</a>
+      <a href="index.html#derivs">Leverage</a>
+      <a href="war.html" class="on">War Risk</a>
+    </div>
+    <div class="nav-status" id="nav-status">
+      <span class="status-dot" id="status-dot"></span><span id="status-text">Loading…</span>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <p class="eyebrow">War Risk Monitor</p>
+  <h1>When geography<br>becomes a market force.</h1>
+  <p class="sub">Wars move markets through a handful of physical channels — oil, shipping lanes,
+     food, chips. This page tracks the physical reality (tankers actually moving through the
+     world's chokepoints) against the financial reaction (the oil price), flags divergences
+     between the two, and explains each theater's transmission into your portfolio.</p>
+</header>
+
+<main>
+  <section class="section wrap" style="padding-top: 8px;">
+    <div id="divergence-banner"></div>
+  </section>
+
+  <section class="section wrap" id="tracker" style="padding-top: 12px;">
+    <div class="section-head">
+      <h2>Physical Flows vs Price</h2>
+      <p>Daily tanker transits through the Middle-East export corridor (AIS-observed, IMF
+         PortWatch) against Brent. When these two disagree, one of them is wrong.</p>
+    </div>
+    <div class="grid" id="grid-tracker"></div>
+  </section>
+
+  <section class="section wrap" id="chokepoints">
+    <div class="section-head">
+      <h2>Chokepoint Monitor</h2>
+      <p>14-day average tanker transits vs each strait's calm-year (2023) norm. Falling flows at
+         a war theater = disruption; rising flows around the Cape of Good Hope = ships paying to
+         avoid one.</p>
+    </div>
+    <div class="grid three" id="grid-chokepoints"></div>
+  </section>
+
+  <section class="section wrap" id="theaters">
+    <div class="section-head">
+      <h2>The Theaters</h2>
+      <p>What each conflict actually touches, how it reaches markets, and what the playbook has
+         historically been in each direction.</p>
+    </div>
+    <div class="grid" id="grid-theaters"></div>
+  </section>
+
+  <section class="section wrap" id="warnews">
+    <div class="section-head">
+      <h2>War &amp; Geopolitics Wire</h2>
+      <p>Latest conflict-related headlines from world and maritime feeds, filtered for
+         market-relevant risk.</p>
+    </div>
+    <div class="grid" id="grid-warnews"></div>
+  </section>
+
+  <section class="section wrap" id="method">
+    <div class="section-head">
+      <h2>Method &amp; honest caveats</h2>
+      <p>How this page computes what it shows — and where it can be wrong.</p>
+    </div>
+    <div class="grid" id="grid-method"></div>
+    <div class="disclaimer" style="margin-top: 20px;">
+      <strong>Educational tool, not financial advice.</strong> Conflict situations are exactly
+      where markets are least predictable. Everything here describes historical patterns and
+      current public data — both can fail precisely when it matters most.
+    </div>
+  </section>
+</main>
+
+<footer class="footer wrap">
+  <div>Waypoint · War Risk · flows data © IMF PortWatch (AIS-derived estimates) ·
+    <a href="https://github.com/iwaheedo/macrodashboard" target="_blank" rel="noopener">source &amp; docs</a></div>
+  <div class="foot-status" id="foot-status"></div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
+<script src="war.js"></script>
+</body>
+</html>

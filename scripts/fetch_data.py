@@ -271,6 +271,81 @@ def build_derivs() -> dict:
     return out
 
 
+# ------------------------------------------------------------- war risk ----
+
+WAR_SINCE = "2023-01-01"
+BASELINE_YEAR = "2023"          # fixed pre-crisis reference year, documented
+
+
+def _ma(vals: list[float], window: int) -> list[float | None]:
+    out, acc = [], 0.0
+    for i, v in enumerate(vals):
+        acc += v
+        if i >= window:
+            acc -= vals[i - window]
+        out.append(round(acc / window, 1) if i >= window - 1 else None)
+    return out
+
+
+def build_war() -> dict:
+    prev = _load("war.json") or {}
+    brent = S.fred(["DCOILBRENTEU"], start=WAR_SINCE)["DCOILBRENTEU"]
+
+    chokepoints = {}
+    for key, (portid, label) in S.CHOKEPOINTS.items():
+        try:
+            raw = S.portwatch_chokepoint(portid, since=WAR_SINCE)
+        except Exception as e:
+            old = (prev.get("chokepoints") or {}).get(key)
+            if old:
+                print(f"  note: portwatch {key} failed ({e}); reusing previous data")
+                chokepoints[key] = old
+                continue
+            raise
+        tankers = raw["tankers"]
+        base_vals = [v for d, v in zip(raw["dates"], tankers) if d.startswith(BASELINE_YEAR)]
+        baseline = sum(base_vals) / len(base_vals) if base_vals else None
+        ma14 = _ma(tankers, 14)
+        ma_last = next((v for v in reversed(ma14) if v is not None), None)
+        dev = None
+        if baseline and ma_last is not None:
+            dev = (ma_last / baseline - 1.0) * 100.0
+        chokepoints[key] = {
+            "label": label,
+            "dates": raw["dates"],
+            "tankers": tankers,
+            "tankers_ma14": ma14,
+            "dwt_ma14": _ma(raw["dwt"], 14),
+            "baseline_2023": None if baseline is None else round(baseline, 1),
+            "ma14_last": ma_last,
+            "dev_pct": None if dev is None else round(dev, 1),
+        }
+
+    reads = {}
+    for key, cp in chokepoints.items():
+        reads[key] = I.read_chokepoint(cp["label"], cp.get("dev_pct"), cp.get("ma14_last"),
+                                       cp.get("baseline_2023"),
+                                       reroute=(key == "cape_good_hope"))
+    reads["brent"] = I.read_brent(brent)
+
+    corridor_devs = [chokepoints[k].get("dev_pct") for k in ("hormuz", "bab_el_mandeb", "suez")
+                     if chokepoints.get(k, {}).get("dev_pct") is not None]
+    corridor_dev = sum(corridor_devs) / len(corridor_devs) if corridor_devs else None
+    from transform import pct_change_over
+    divergence = I.flow_price_divergence(corridor_dev, pct_change_over(brent, 30),
+                                         last(brent) if brent["values"] else None)
+    divergence["corridor_dev_pct"] = None if corridor_dev is None else round(corridor_dev, 1)
+    divergence["brent_chg30_pct"] = (None if pct_change_over(brent, 30) is None
+                                     else round(pct_change_over(brent, 30), 1))
+
+    news = S.war_news()
+    if not news:
+        news = prev.get("news") or []
+
+    return {"fetched_at": now_iso(), "brent": brent, "chokepoints": chokepoints,
+            "divergence": divergence, "reads": reads, "news": news}
+
+
 # ---------------------------------------------------------- news/calendar ---
 
 def build_newscal() -> dict:
@@ -287,7 +362,7 @@ def build_newscal() -> dict:
 
 # ---------------------------------------------------------------- signals ---
 
-def build_signals(macro: dict, crypto: dict, derivs: dict) -> dict:
+def build_signals(macro: dict, crypto: dict, derivs: dict, war: dict | None = None) -> dict:
     ms, cs = macro["series"], crypto["series"]
     reads = {}
 
@@ -339,9 +414,14 @@ def build_signals(macro: dict, crypto: dict, derivs: dict) -> dict:
                                   cs["btc_price"], cs["btc_200wma"])
     reg = composites.regime(liq, risk)
 
-    return {"generated_at": now_iso(), "reads": reads,
-            "gauges": {"liquidity_impulse": liq, "risk_appetite": risk,
-                       "crypto_cycle": cyc, "regime": reg}}
+    out = {"generated_at": now_iso(), "reads": reads,
+           "gauges": {"liquidity_impulse": liq, "risk_appetite": risk,
+                      "crypto_cycle": cyc, "regime": reg}}
+    if war and war.get("divergence"):
+        d = war["divergence"]
+        out["war"] = {k: d.get(k) for k in ("state", "signal", "title",
+                                            "corridor_dev_pct", "brent_chg30_pct")}
+    return out
 
 
 # ------------------------------------------------------------------- main ---
@@ -351,6 +431,7 @@ STAGES = {
     "crypto": (build_crypto, "crypto.json", True),
     "derivs": (build_derivs, "derivs.json", False),
     "newscal": (build_newscal, "newscal.json", False),
+    "war": (build_war, "war.json", False),
 }
 
 
@@ -387,9 +468,10 @@ def main(argv: list[str]) -> int:
             macro = results.get("macro") or _load("macro.json")
             crypto = results.get("crypto") or _load("crypto.json")
             derivs = results.get("derivs") or _load("derivs.json") or {}
+            war = results.get("war") or _load("war.json")
             if not macro or not crypto:
                 raise RuntimeError("signals skipped: macro/crypto data unavailable")
-            signals = build_signals(macro, crypto, derivs)
+            signals = build_signals(macro, crypto, derivs, war)
             write_json("signals.json", signals)
             meta_sources["signals"] = {"ok": True, "fetched_at": signals["generated_at"], "error": None}
         except Exception as e:

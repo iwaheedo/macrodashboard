@@ -407,6 +407,63 @@ def long_short_ratio(coin: str = "BTC") -> dict:
     return s
 
 
+# ------------------------------------------------- IMF PortWatch (war) ------
+
+PORTWATCH_URL = ("https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/"
+                 "Daily_Chokepoints_Data/FeatureServer/0/query")
+
+CHOKEPOINTS = {
+    "hormuz": ("chokepoint6", "Strait of Hormuz"),
+    "bab_el_mandeb": ("chokepoint4", "Bab el-Mandeb Strait"),
+    "suez": ("chokepoint1", "Suez Canal"),
+    "cape_good_hope": ("chokepoint7", "Cape of Good Hope"),
+    "bosporus": ("chokepoint3", "Bosporus Strait"),
+    "kerch": ("chokepoint28", "Kerch Strait"),
+    "taiwan_strait": ("chokepoint11", "Taiwan Strait"),
+}
+
+
+def portwatch_chokepoint(portid: str, since: str = "2023-01-01") -> dict:
+    """Daily tanker transits + tanker DWT capacity for one chokepoint.
+
+    IMF PortWatch AIS-derived data (keyless ArcGIS feature service, ~1000 rows
+    per page). Returns {"dates": [...], "tankers": [...], "dwt": [...]}.
+    """
+    from urllib.parse import urlencode
+    rows: dict[str, tuple[int, int]] = {}
+    offset = 0
+    while True:
+        params = urlencode({
+            "where": f"portid='{portid}' AND date >= DATE '{since}'",
+            "outFields": "date,n_tanker,capacity_tanker",
+            "orderByFields": "date ASC",
+            "returnGeometry": "false",
+            "resultRecordCount": 1000,
+            "resultOffset": offset,
+            "f": "json",
+        })
+        j = get_json(f"{PORTWATCH_URL}?{params}", timeout=60)
+        if "error" in j:
+            raise FetchError(f"portwatch {portid}: {j['error']}")
+        feats = j.get("features", [])
+        for f in feats:
+            a = f["attributes"]
+            dt = str(a.get("date", ""))[:10]
+            if dt:
+                rows[dt] = (int(a.get("n_tanker") or 0), int(a.get("capacity_tanker") or 0))
+        if len(feats) < 1000:
+            break
+        offset += len(feats)
+        if offset > 20000:  # safety
+            break
+    dates = sorted(rows)
+    if not dates:
+        raise FetchError(f"portwatch {portid}: no rows")
+    return {"dates": dates,
+            "tankers": [rows[d][0] for d in dates],
+            "dwt": [rows[d][1] for d in dates]}
+
+
 # ------------------------------------------------------- calendar & news ----
 
 def econ_calendar() -> list[dict]:
@@ -432,7 +489,45 @@ NEWS_FEEDS = [
     ("MarketWatch", "macro", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
 ]
 
+WAR_FEEDS = [
+    ("Al Jazeera", "world", "https://www.aljazeera.com/xml/rss/all.xml"),
+    ("BBC World", "world", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+    ("gCaptain", "maritime", "https://gcaptain.com/feed/"),
+]
+
+# headlines mentioning any of these count as war/geopolitical-risk news
+WAR_KEYWORDS = [
+    "war", "strike", "missile", "drone", "attack", "military", "troops",
+    "iran", "israel", "hezbollah", "houthi", "yemen", "gaza", "lebanon",
+    "ukraine", "russia", "kyiv", "moscow", "nato", "kremlin",
+    "taiwan", "beijing", "south china sea", "pla ",
+    "hormuz", "red sea", "bab el-mandeb", "suez", "tanker", "shipping lane",
+    "sanction", "escalat", "ceasefire", "nuclear", "conflict", "warship",
+    "navy", "blockade", "oil supply", "opec",
+]
+
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _parse_feed(source: str, kind: str, url: str, max_items: int) -> list[dict]:
+    items = []
+    root = ET.fromstring(get(url).decode("utf-8", errors="replace"))
+    for item in root.iter("item"):
+        title = html.unescape(_TAG_RE.sub("", (item.findtext("title") or "").strip()))
+        link = (item.findtext("link") or "").strip()
+        pub = (item.findtext("pubDate") or "").strip()
+        iso = ""
+        if pub:
+            try:
+                iso = parsedate_to_datetime(pub).astimezone(timezone.utc).isoformat()
+            except Exception:
+                pass
+        if title and link:
+            items.append({"title": title[:200], "link": link, "source": source,
+                          "kind": kind, "published": iso})
+        if len(items) >= max_items:
+            break
+    return items
 
 
 def news(max_per_feed: int = 8) -> list[dict]:
@@ -440,23 +535,36 @@ def news(max_per_feed: int = 8) -> list[dict]:
     items = []
     for source, kind, url in NEWS_FEEDS:
         try:
-            root = ET.fromstring(get(url).decode("utf-8", errors="replace"))
-            for item in root.iter("item"):
-                title = html.unescape(_TAG_RE.sub("", (item.findtext("title") or "").strip()))
-                link = (item.findtext("link") or "").strip()
-                pub = (item.findtext("pubDate") or "").strip()
-                iso = ""
-                if pub:
-                    try:
-                        iso = parsedate_to_datetime(pub).astimezone(timezone.utc).isoformat()
-                    except Exception:
-                        pass
-                if title and link:
-                    items.append({"title": title[:200], "link": link, "source": source,
-                                  "kind": kind, "published": iso})
-                if sum(1 for i in items if i["source"] == source) >= max_per_feed:
-                    break
+            items.extend(_parse_feed(source, kind, url, max_per_feed))
         except Exception:
             continue
     items.sort(key=lambda i: i["published"], reverse=True)
     return items
+
+
+def is_war_headline(title: str) -> bool:
+    t = " " + title.lower() + " "
+    return any(k in t for k in WAR_KEYWORDS)
+
+
+def war_news(max_items: int = 18) -> list[dict]:
+    """War/geopolitics headlines: dedicated world feeds + keyword-matched
+    items from the market feeds. Per-feed failures are skipped."""
+    items = []
+    for source, kind, url in WAR_FEEDS + NEWS_FEEDS:
+        try:
+            fetched = _parse_feed(source, kind, url, 25)
+        except Exception:
+            continue
+        items.extend(i for i in fetched if is_war_headline(i["title"]))
+    seen, out = set(), []
+    items.sort(key=lambda i: i["published"], reverse=True)
+    for i in items:
+        key = i["title"].lower()[:80]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(i)
+        if len(out) >= max_items:
+            break
+    return out

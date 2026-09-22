@@ -381,6 +381,91 @@ def read_long_short(s):
     return read(v, sig, f"{_fmt(v)} long accounts per short account on OKX: {verdict}.")
 
 
+# -------------------------------------------------------- war-risk reads ---
+
+def read_chokepoint(label: str, dev_pct: float | None, ma14: float | None,
+                    baseline: float | None, reroute: bool = False):
+    """Interpret a chokepoint's 14-day tanker flow vs its 2023 baseline.
+
+    `reroute=True` flips the logic for the Cape of Good Hope, where RISING
+    traffic is the disruption signal (ships avoiding the Red Sea).
+    """
+    if dev_pct is None or ma14 is None:
+        return read(None, "info", f"{label}: no recent flow data.")
+    v = round(ma14, 1)
+    d = f"{dev_pct:+.0f}%"
+    if reroute:
+        if dev_pct > 25:
+            return read(v, "caution", f"{label} traffic is {d} vs the 2023 norm — ships are paying 10–14 extra days to avoid the Red Sea, confirming the disruption is real.")
+        if dev_pct > 10:
+            return read(v, "neutral", f"{label} traffic is {d} vs the 2023 norm — mildly elevated rerouting.")
+        return read(v, "good", f"{label} traffic is {d} vs the 2023 norm — no unusual rerouting around Africa.")
+    if dev_pct < -60:
+        return read(v, "caution", f"{label}: observed tanker flow is {d} vs the 2023 norm ({v}/day vs ~{baseline:.0f}) — either a severe physical disruption or heavy AIS signal loss (jamming/dark sailing). Cross-check the headlines.")
+    if dev_pct < -25:
+        return read(v, "caution", f"{label}: tanker flow is {d} vs the 2023 norm — a meaningful disruption is underway.")
+    if dev_pct < -10:
+        return read(v, "neutral", f"{label}: tanker flow is {d} vs the 2023 norm — somewhat below normal, worth watching.")
+    return read(v, "good", f"{label}: tanker flow is {d} vs the 2023 norm — moving freely.")
+
+
+def read_brent(s):
+    v = last(s)
+    ch30 = pct_change_over(s, 30)
+    ch365 = pct_change_over(s, 365)
+    bits = []
+    if ch30 is not None:
+        bits.append(f"{ch30:+.0f}% in 30 days")
+    if ch365 is not None:
+        bits.append(f"{ch365:+.0f}% in 1 year")
+    if v > 110 or (ch30 or 0) > 20:
+        sig, verdict = "caution", "a genuine supply-fear price — this level acts as a global tax and keeps central banks nervous"
+    elif v > 90 or (ch30 or 0) > 10:
+        sig, verdict = "caution", "an elevated price with a geopolitical premium in it"
+    elif v < 65:
+        sig, verdict = "good", "cheap oil — markets see supply as safe"
+    else:
+        sig, verdict = "neutral", "a normal range — no crisis priced in"
+    return read(v, sig, f"Brent is ${_fmt(v, 0)} ({', '.join(bits)}): {verdict}.")
+
+
+def flow_price_divergence(corridor_dev: float | None, brent_chg30: float | None,
+                          brent_level: float | None):
+    """The tracker's headline: do physical flows and the oil price agree?
+
+    Returns {"state", "signal", "title", "text"} — states:
+      disruption_underpriced  flows collapsed, price hasn't followed
+      disruption_priced       flows collapsed, price responding
+      premium_no_disruption   price spiking while flows are normal
+      aligned                 nothing unusual on either side
+    """
+    if corridor_dev is None or brent_chg30 is None:
+        return {"state": "unknown", "signal": "info", "title": "Tracker offline",
+                "text": "Flow or price data is unavailable right now."}
+    flows_disrupted = corridor_dev < -25
+    price_hot = brent_chg30 > 10
+    if flows_disrupted and not price_hot:
+        return {"state": "disruption_underpriced", "signal": "caution",
+                "title": "Flows disrupted — price not fully reflecting it",
+                "text": (f"Middle-East corridor tanker flow is {corridor_dev:+.0f}% vs its 2023 norm, yet Brent is only {brent_chg30:+.0f}% over 30 days. "
+                         "Two readings: markets expect the disruption to resolve quickly (or see ample spare capacity/pipeline bypass), or observed AIS flow understates real shipments because of jamming and dark sailing. "
+                         "Either way the gap itself is the risk: if the physical shortfall is real and persists, oil has repricing room — and risk assets have not paid for that scenario.")}
+    if flows_disrupted and price_hot:
+        return {"state": "disruption_priced", "signal": "caution",
+                "title": "Physical disruption underway — and priced",
+                "text": (f"Corridor tanker flow is {corridor_dev:+.0f}% vs the 2023 norm and Brent is {brent_chg30:+.0f}% over 30 days at ${brent_level:.0f}. "
+                         "The market is tracking the physical reality. Watch for the reverse divergence: flows recovering while price stays high would mean the premium is ready to bleed out.")}
+    if not flows_disrupted and price_hot:
+        return {"state": "premium_no_disruption", "signal": "caution",
+                "title": "War premium without physical disruption",
+                "text": (f"Brent is {brent_chg30:+.0f}% over 30 days while corridor tanker flow is roughly normal ({corridor_dev:+.0f}% vs 2023). "
+                         "That is a fear premium, not a shortage. Historically pure fear premia bleed out within weeks unless barrels actually stop moving — but they are also what the market pays when it believes escalation is imminent.")}
+    return {"state": "aligned", "signal": "good",
+            "title": "Flows and price agree",
+            "text": (f"Corridor tanker flow is {corridor_dev:+.0f}% vs the 2023 norm and Brent has moved {brent_chg30:+.0f}% in 30 days. "
+                     "No divergence between the physical and the financial picture — war risk is not the market's problem today.")}
+
+
 def read_ethbtc(s):
     v = last(s)
     ch = pct_change_over(s, 91)

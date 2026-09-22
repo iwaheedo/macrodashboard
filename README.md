@@ -32,6 +32,9 @@ Static site (no build step): index.html + styles.css + app.js + Chart.js CDN
 | Funding, open interest, long/short | OKX → Bybit → Binance chain | keeps last good data |
 | Economic calendar | ForexFactory weekly JSON | keeps last good data |
 | Headlines | CoinDesk / Cointelegraph / Decrypt / WSJ / MarketWatch RSS | per-feed skip |
+| Chokepoint tanker flows (war page) | IMF PortWatch ArcGIS API (AIS-derived, ~2–4 day lag) | keeps last good data |
+| Brent crude | FRED (DCOILBRENTEU) | — |
+| War headlines | Al Jazeera / BBC World / gCaptain + keyword filter over market feeds | per-feed skip |
 
 Notes discovered the hard way (do not "fix" these):
 
@@ -59,10 +62,45 @@ python3 -m http.server 8741 --directory site   # view at localhost:8741
 
 No dependencies — pure Python 3.10+ stdlib.
 
+## War Risk page (`war.html`)
+
+Theater playbooks (Iran/Hormuz, Red Sea, Russia–Ukraine, Taiwan), a
+physical-flows-vs-price tracker (tanker transits through Hormuz, Bab el-Mandeb
+and Suez vs Brent), and a divergence detector with four states:
+`aligned`, `disruption_priced`, `disruption_underpriced`,
+`premium_no_disruption`. Baseline = each chokepoint's calendar-2023 average;
+disruption = 14-day flow >25% below baseline; hot price = Brent +10% in 30
+days. AIS caveat: jamming and dark sailing can make observed flows understate
+real traffic — the page says so wherever it matters.
+
+## Refresh cadence & cost
+
+- Pipeline cron: **every 4 hours** (`23 */4 * * *`), plus on every code push.
+  Each run re-fetches data, recomputes every "Right now" read, gauge and the
+  war divergence banner, then redeploys.
+- Effective freshness is source-bound: FRED market series update ~daily,
+  PortWatch lags ~2–4 days, MVRV ~1 week, spot crypto/news are near-live at
+  each run. Every card footer shows its own data-through date.
+- **Cost: $0.** Public repo → GitHub Actions minutes and Pages hosting are
+  free; every API is keyless/free tier. **No LLM anywhere** — all generated
+  text is deterministic threshold rules in `interpret.py`, so runs cost zero
+  tokens and the behavior is reproducible and testable.
+
+## Security
+
+- **No secrets exist** in this system — no API keys, no tokens beyond the
+  workflow's own scoped `GITHUB_TOKEN`. Nothing to leak or rotate.
+- Static site, no backend, no user input, no cookies, no analytics.
+- CSP meta on both pages; the only external asset (Chart.js, pinned 4.4.9) is
+  loaded with an SRI integrity hash from jsdelivr.
+- All externally-sourced strings (news titles, calendar rows) are HTML-escaped
+  before rendering.
+- Workflows use only official `actions/*` steps.
+
 ## Maintenance (designed to be near zero)
 
-- **Refresh:** `update-data.yml` runs 4×/day, validates, commits data and
-  redeploys Pages. Data commits carry `[skip ci]`.
+- **Refresh:** `update-data.yml` runs every 4 hours, validates, commits data
+  and redeploys Pages. Data commits carry `[skip ci]`.
 - **If a run fails:** the workflow opens (or comments on) an issue labeled
   `pipeline-alert` — you get a GitHub notification email. The site keeps
   serving the last good data meanwhile, and every card footer shows how fresh

@@ -569,6 +569,15 @@ function renderTiles() {
   if (ms.gold) t.push(tile("Gold", fmt.usd0(ms.gold.values.at(-1)), pctDelta(ms.gold)));
   if (ms.vix) t.push(tile("VIX", ms.vix.values.at(-1).toFixed(1), null));
   if (cs.fng) t.push(tile("Fear & Greed", Math.round(cs.fng.values.at(-1)) + "/100", null));
+  const war = DATA.signals?.war;
+  if (war && war.state) {
+    const words = { aligned: "Calm", disruption_priced: "Disruption, priced",
+                    disruption_underpriced: "Underpriced risk", premium_no_disruption: "Fear premium" };
+    t.push(`<a class="tile" href="war.html" style="text-decoration:none;color:inherit">
+      <div class="t-label">War risk</div>
+      <div class="t-value" style="font-size:16px;line-height:1.3;padding-top:3px">${words[war.state] || war.state}</div>
+      <div class="t-delta ${war.signal === "caution" ? "neg" : war.signal === "good" ? "pos" : "flat"}">Open monitor →</div></a>`);
+  }
   el.innerHTML = t.join("");
 }
 

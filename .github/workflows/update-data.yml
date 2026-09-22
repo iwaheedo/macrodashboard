@@ -2,7 +2,7 @@ name: Update data & deploy
 
 on:
   schedule:
-    - cron: "23 1,7,13,19 * * *"   # four times a day, offset from the top of the hour
+    - cron: "23 */4 * * *"   # every 4 hours, offset from the top of the hour
   workflow_dispatch:
   push:
     branches: [main]
