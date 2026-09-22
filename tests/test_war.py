@@ -66,6 +66,28 @@ class TestChokepointReads(unittest.TestCase):
         self.assertEqual(calm["signal"], "good")
 
 
+class TestBaselineWindows(unittest.TestCase):
+    def test_window_mean_respects_bounds(self):
+        import fetch_data as F
+        dates = ["2021-12-31", "2022-01-01", "2022-01-02", "2022-02-01"]
+        vals = [100, 10, 20, 999]
+        self.assertEqual(F._window_mean(dates, vals, "2022-01-01", "2022-01-31"), 15.0)
+        self.assertIsNone(F._window_mean(dates, vals, "2030-01-01", "2030-12-31"))
+
+    def test_every_chokepoint_has_a_prewar_window(self):
+        import fetch_data as F
+        self.assertEqual(set(F.BASELINE_WINDOWS), set(S.CHOKEPOINTS))
+        for key, (fetch_since, start, end, label) in F.BASELINE_WINDOWS.items():
+            self.assertLessEqual(fetch_since, start, key)   # window must be fetched
+            self.assertLess(start, end, key)
+            self.assertTrue(label, key)
+        # Black Sea baselines must predate the Feb 2022 invasion
+        self.assertLess(F.BASELINE_WINDOWS["kerch"][2], "2022-02-24")
+        self.assertLess(F.BASELINE_WINDOWS["bosporus"][2], "2022-02-24")
+        # Red Sea baselines must predate the Nov 2023 Houthi campaign
+        self.assertLess(F.BASELINE_WINDOWS["bab_el_mandeb"][2], "2023-11-19")
+
+
 class TestWarNewsFilter(unittest.TestCase):
     def test_keyword_matching(self):
         self.assertTrue(S.is_war_headline("Iran warns over Strait of Hormuz transit"))

@@ -273,8 +273,26 @@ def build_derivs() -> dict:
 
 # ------------------------------------------------------------- war risk ----
 
-WAR_SINCE = "2023-01-01"
-BASELINE_YEAR = "2023"          # fixed pre-crisis reference year, documented
+DISPLAY_SINCE = "2023-01-01"     # what ships to the chart
+
+# Per-chokepoint PRE-WAR baseline windows: (fetch_since, base_start, base_end,
+# label). Each strait is measured against its own last-normal period, not a
+# global year — 2023 is already war-affected for the Black Sea, and includes
+# the start of the Houthi campaign for the Red Sea.
+BASELINE_WINDOWS = {
+    "hormuz":         ("2023-01-01", "2024-11-01", "2025-10-31", "pre-crisis year (Nov ’24–Oct ’25)"),
+    "bab_el_mandeb":  ("2023-01-01", "2023-01-01", "2023-10-31", "pre-Houthi campaign (Jan–Oct ’23)"),
+    "suez":           ("2023-01-01", "2023-01-01", "2023-10-31", "pre-Houthi campaign (Jan–Oct ’23)"),
+    "cape_good_hope": ("2023-01-01", "2023-01-01", "2023-10-31", "pre-rerouting (Jan–Oct ’23)"),
+    "bosporus":       ("2019-01-01", "2019-01-01", "2022-01-31", "pre-invasion (2019–Jan ’22)"),
+    "kerch":          ("2019-01-01", "2019-01-01", "2022-01-31", "pre-invasion (2019–Jan ’22)"),
+    "taiwan_strait":  ("2023-01-01", "2024-01-01", "2025-12-31", "recent calm norm (2024–25)"),
+}
+
+
+def _window_mean(dates: list[str], vals: list, start: str, end: str) -> float | None:
+    xs = [v for d, v in zip(dates, vals) if start <= d <= end]
+    return sum(xs) / len(xs) if xs else None
 
 
 def _ma(vals: list[float], window: int) -> list[float | None]:
@@ -289,22 +307,28 @@ def _ma(vals: list[float], window: int) -> list[float | None]:
 
 def build_war() -> dict:
     prev = _load("war.json") or {}
-    brent = S.fred(["DCOILBRENTEU"], start=WAR_SINCE)["DCOILBRENTEU"]
+    brent = S.fred(["DCOILBRENTEU"], start=DISPLAY_SINCE)["DCOILBRENTEU"]
 
     chokepoints = {}
     for key, (portid, label) in S.CHOKEPOINTS.items():
+        fetch_since, base_start, base_end, base_label = BASELINE_WINDOWS[key]
         try:
-            raw = S.portwatch_chokepoint(portid, since=WAR_SINCE)
+            raw = S.portwatch_chokepoint(portid, since=fetch_since)
         except Exception as e:
             old = (prev.get("chokepoints") or {}).get(key)
             if old:
                 print(f"  note: portwatch {key} failed ({e}); reusing previous data")
+                if "baseline" not in old and "baseline_2023" in old:  # pre-rename files
+                    old["baseline"] = old.pop("baseline_2023")
+                    old["baseline_label"] = "2023 average"
                 chokepoints[key] = old
                 continue
             raise
-        tankers = raw["tankers"]
-        base_vals = [v for d, v in zip(raw["dates"], tankers) if d.startswith(BASELINE_YEAR)]
-        baseline = sum(base_vals) / len(base_vals) if base_vals else None
+        # baseline over the pre-war window, computed BEFORE slicing to display
+        baseline = _window_mean(raw["dates"], raw["tankers"], base_start, base_end)
+        cut = next((i for i, d in enumerate(raw["dates"]) if d >= DISPLAY_SINCE), 0)
+        dates = raw["dates"][cut:]
+        tankers = raw["tankers"][cut:]
         ma14 = _ma(tankers, 14)
         ma_last = next((v for v in reversed(ma14) if v is not None), None)
         dev = None
@@ -312,11 +336,12 @@ def build_war() -> dict:
             dev = (ma_last / baseline - 1.0) * 100.0
         chokepoints[key] = {
             "label": label,
-            "dates": raw["dates"],
+            "dates": dates,
             "tankers": tankers,
             "tankers_ma14": ma14,
-            "dwt_ma14": _ma(raw["dwt"], 14),
-            "baseline_2023": None if baseline is None else round(baseline, 1),
+            "dwt_ma14": _ma(raw["dwt"][cut:], 14),
+            "baseline": None if baseline is None else round(baseline, 1),
+            "baseline_label": base_label,
             "ma14_last": ma_last,
             "dev_pct": None if dev is None else round(dev, 1),
         }
@@ -324,7 +349,7 @@ def build_war() -> dict:
     reads = {}
     for key, cp in chokepoints.items():
         reads[key] = I.read_chokepoint(cp["label"], cp.get("dev_pct"), cp.get("ma14_last"),
-                                       cp.get("baseline_2023"),
+                                       cp.get("baseline"),
                                        reroute=(key == "cape_good_hope"))
     reads["brent"] = I.read_brent(brent)
 

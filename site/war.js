@@ -114,7 +114,7 @@ function renderBanner() {
       <div class="banner-eyebrow">Flows ↔ price divergence check</div>
       <div class="banner-title">${esc(d.title)}</div>
       <div class="banner-stats">
-        <div class="bstat"><span>Corridor tanker flow vs 2023</span><b>${d.corridor_dev_pct == null ? "–" : (d.corridor_dev_pct > 0 ? "+" : "") + d.corridor_dev_pct + "%"}</b></div>
+        <div class="bstat"><span>Corridor tanker flow vs pre-war</span><b>${d.corridor_dev_pct == null ? "–" : (d.corridor_dev_pct > 0 ? "+" : "") + d.corridor_dev_pct + "%"}</b></div>
         <div class="bstat"><span>Brent, 30-day change</span><b>${d.brent_chg30_pct == null ? "–" : (d.brent_chg30_pct > 0 ? "+" : "") + d.brent_chg30_pct + "%"}</b></div>
         <div class="bstat"><span>Brent</span><b>$${DATA.war.brent.values.at(-1).toFixed(0)}</b></div>
       </div>
@@ -205,7 +205,7 @@ function renderChokepoints() {
     el.innerHTML = `
       <div class="card-top"><div>
         <h3 class="card-title">${esc(cp.label)}</h3>
-        <p class="card-sub">14-day avg: <b>${cp.ma14_last ?? "–"}</b> tankers/day · 2023 norm: ${cp.baseline_2023 ?? "–"}</p>
+        <p class="card-sub">14-day avg: <b>${cp.ma14_last ?? "–"}</b> tankers/day · norm: ${cp.baseline ?? "–"}<br>${esc(cp.baseline_label || "")}</p>
       </div><span class="t-delta ${devCls}" style="font-size:15px">${devTxt}</span></div>
       <div class="chart-box mini"><canvas id="cv-cp-${key}"></canvas></div>
       ${nowBox(read)}`;
@@ -244,7 +244,7 @@ function watchChips(t) {
     } else {
       const cp = w.chokepoints[key];
       if (cp && cp.dev_pct != null)
-        bits.push(`${esc(cp.label)} <b>${cp.dev_pct > 0 ? "+" : ""}${cp.dev_pct.toFixed(0)}%</b> vs 2023`);
+        bits.push(`${esc(cp.label)} <b>${cp.dev_pct > 0 ? "+" : ""}${cp.dev_pct.toFixed(0)}%</b> vs pre-war`);
     }
   }
   const vix = DATA.macro?.series?.vix;
@@ -294,11 +294,14 @@ function renderWarNews() {
 /* ------------------------------------------------------------- method --- */
 function renderMethod() {
   document.getElementById("grid-method").innerHTML = `
-    <div class="method-card"><h3>The flows</h3>
+    <div class="method-card"><h3>The flows &amp; pre-war baselines</h3>
       <p>IMF PortWatch estimates daily transit counts per chokepoint from satellite AIS ship
-      signals, with a ~2–4 day lag. "Corridor flow" is the average deviation of Hormuz,
-      Bab el-Mandeb and Suez tanker transits (14-day mean) from their calendar-2023 averages —
-      2023 being the last calm reference year on all three.</p></div>
+      signals, with a ~2–4 day lag. Each strait is measured against its own last-normal
+      period, not a global year: Hormuz vs Nov ’24–Oct ’25 (its last calm year before the
+      current crisis), the Red Sea routes vs Jan–Oct ’23 (before the Houthi campaign), the
+      Black Sea straits vs 2019–Jan ’22 (before the invasion of Ukraine), Taiwan vs its
+      recent calm norm. "Corridor flow" is the average deviation of Hormuz, Bab el-Mandeb
+      and Suez from those baselines.</p></div>
     <div class="method-card"><h3>The divergence check</h3>
       <p>Flows more than 25% below norm counts as disruption; Brent up more than 10% in 30 days
       counts as a hot price. The four combinations produce the banner above. Thresholds are

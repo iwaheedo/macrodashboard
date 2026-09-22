@@ -68,8 +68,11 @@ Theater playbooks (Iran/Hormuz, Red Sea, Russia–Ukraine, Taiwan), a
 physical-flows-vs-price tracker (tanker transits through Hormuz, Bab el-Mandeb
 and Suez vs Brent), and a divergence detector with four states:
 `aligned`, `disruption_priced`, `disruption_underpriced`,
-`premium_no_disruption`. Baseline = each chokepoint's calendar-2023 average;
-disruption = 14-day flow >25% below baseline; hot price = Brent +10% in 30
+`premium_no_disruption`. Baseline = each chokepoint's own **pre-war window**
+(Hormuz: Nov ’24–Oct ’25, its last calm year; Red Sea routes: Jan–Oct ’23,
+pre-Houthi; Black Sea straits: 2019–Jan ’22, pre-invasion; Taiwan: 2024–25
+calm norm) — defined in `BASELINE_WINDOWS` in `scripts/fetch_data.py`.
+Disruption = 14-day flow >25% below baseline; hot price = Brent +10% in 30
 days. AIS caveat: jamming and dark sailing can make observed flows understate
 real traffic — the page says so wherever it matters.
 
