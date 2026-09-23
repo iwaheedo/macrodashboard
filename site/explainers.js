@@ -123,6 +123,31 @@ const EXPLAINERS = {
     up: "Rising usage alongside rising price → the move has fundamental participation behind it.",
     down: "Falling usage during a rally → price is moving on leverage and thin participation; treat the move with more suspicion.",
   },
+  costbasis: {
+    what: "Bitcoin against the market's cost-basis ladder: the realized price (what the average coin was last bought for) and the short-term holder (STH) cost basis (what recent buyers paid). This is the market-structure view The DeFi Report's cohort analysis is built on — who is in profit, and by how much.",
+    up: "Price pulling far above both lines → everyone is in profit, and eventually that profit becomes selling pressure. A moderate premium over the STH line is what a healthy bull looks like.",
+    down: "Losing the STH line traps recent buyers and turns rallies into exits; losing the realized price is full capitulation — historically where cycle bottoms formed.",
+  },
+  dominance: {
+    what: "Bitcoin's share of the majors (BTC vs BTC+ETH+stablecoins — a proxy that tracks the same turns as headline BTC dominance). Cycles have a rotation rhythm: capital moves into BTC first, then down the risk curve.",
+    up: "Rising off a cycle low → the early-bull pattern: money favors Bitcoin before it trusts anything else.",
+    down: "Falling during an uptrend → rotation into ETH and alts (mid/late-bull behavior, historically when altseasons happened). Falling in a downtrend just means BTC is weak.",
+  },
+  etf: {
+    what: "Daily net flows into US spot-Bitcoin ETFs — the institutional pipe. This is the structural demand channel this cycle has that earlier cycles didn't.",
+    up: "Sustained net inflows → advisers and institutions are allocating; a persistent bid under the market that doesn't read Crypto Twitter.",
+    down: "Sustained outflows → the marginal big buyer is gone; rallies need retail and leverage to carry them, which makes them more fragile.",
+  },
+  dex: {
+    what: "Total daily trading volume on decentralized exchanges across all chains — a clean, un-fakeable proxy for real on-chain activity.",
+    up: "Volume expanding with price → the reflexive loop is on: usage confirms the rally. Prior cycles saw activity multiply many-fold in the wealth-creation phase.",
+    down: "Volume fading while price rises → the move is running on leverage and thin conviction — lower-quality rally.",
+  },
+  tvl: {
+    what: "Total value locked in DeFi across all chains — crypto's internal credit system. Together with stablecoin supply, it's the closest thing to an on-chain money supply.",
+    up: "Capital being redeployed into DeFi → the credit rebuild that historically powers the wealth-creation phase.",
+    down: "TVL draining → risk appetite inside crypto contracting; the internal money supply is shrinking.",
+  },
   funding: {
     what: "What perpetual-futures longs pay shorts (or vice versa) every 8 hours to keep their leveraged bets open. The purest real-time read on which side is crowded.",
     up: "High positive funding → leveraged longs are crowded and paying heavily; fuel for violent long-squeeze corrections.",

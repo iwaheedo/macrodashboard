@@ -65,7 +65,7 @@ function asof(series, iso) {
 function sliceRange(series, range) {
   if (!series || !series.dates.length) return { dates: [], values: [] };
   if (range === "All") return series;
-  const yrs = { "1Y": 1, "2Y": 2, "3Y": 3, "5Y": 5, "10Y": 10 }[range] || 100;
+  const yrs = { "3M": 0.25, "1Y": 1, "2Y": 2, "3Y": 3, "5Y": 5, "10Y": 10 }[range] || 100;
   const lastD = new Date(series.dates[series.dates.length - 1]);
   lastD.setFullYear(lastD.getFullYear() - yrs);
   const cut = lastD.toISOString().slice(0, 10);
@@ -233,6 +233,35 @@ const CHARTS = [
     sub: "US dollars per barrel", unit: fmt.usd,
     read: "oil", ranges: ["1Y", "3Y", "10Y"], def: "3Y",
     series: [{ f: "macro", k: "oil", label: "WTI crude" }], source: "FRED (DCOILWTICO)" },
+
+  // -------- playbook (TDR-framework charts)
+  { id: "costbasis", section: "playbook", title: "The Cost-Basis Ladder", full: true,
+    sub: "Price vs the market's average cost basis and what recent buyers paid — the market-structure view", unit: fmt.usd,
+    read: ["sth_basis", "realized"], ranges: ["1Y", "3Y", "All"], def: "3Y", legend: true,
+    series: [{ f: "crypto", k: "btc_price", label: "BTC" },
+             { f: "crypto", k: "btc_sth_realized", label: "STH cost basis", dash: [6, 4], color: C.warn },
+             { f: "crypto", k: "btc_realized", label: "Realized price (all)", dash: [6, 4], color: C.good }],
+    source: "blockchain.com · bitcoin-data.com" },
+  { id: "dominance", section: "playbook", title: "BTC Dominance (majors proxy)",
+    sub: "Bitcoin's share of BTC + ETH + stablecoins — the rotation dial", unit: fmt.pct1,
+    read: "dominance", ranges: ["1Y"], def: "1Y",
+    series: [{ f: "crypto", k: "btc_dominance_proxy", label: "BTC share of majors" }],
+    source: "blockchain.com · CoinGecko · DefiLlama" },
+  { id: "etf", section: "playbook", title: "Spot-ETF Net Flows",
+    sub: "Daily net flows into US spot-Bitcoin ETFs", unit: v => v == null ? "–" : (v >= 0 ? "+" : "") + compact(v) + "M",
+    read: "etf_flows", ranges: ["3M", "1Y"], def: "3M", bar: true, hline: 0, barPosGood: true,
+    series: [{ f: "crypto", k: "etf_flows", label: "Net flow ($M)" }],
+    source: "SoSoValue" },
+  { id: "dex", section: "playbook", title: "On-Chain Activity",
+    sub: "Total DEX trading volume per day, all chains", unit: v => v == null ? "–" : "$" + compact(v) + "B",
+    read: "dex_volume", ranges: ["1Y", "3Y", "All"], def: "1Y", area: true,
+    series: [{ f: "crypto", k: "dex_volume", label: "DEX volume ($B/day)" }],
+    source: "DefiLlama" },
+  { id: "tvl", section: "playbook", title: "DeFi TVL",
+    sub: "Capital locked in DeFi — crypto's internal credit system", unit: v => v == null ? "–" : "$" + compact(v) + "B",
+    read: "defi_tvl", ranges: ["1Y", "3Y", "All"], def: "3Y", area: true,
+    series: [{ f: "crypto", k: "defi_tvl", label: "TVL ($B)" }],
+    source: "DefiLlama" },
 
   // -------- crypto
   { id: "btc", section: "crypto", title: "Bitcoin &amp; Its Reference Lines", full: true,
@@ -432,7 +461,9 @@ function drawChart(cfg, range) {
     return {
       label: spec.label, data, borderColor: color,
       backgroundColor: cfg.bar
-        ? primary.values.map(v => v >= 0 ? "rgba(138,87,49,.75)" : "rgba(63,115,82,.75)")
+        ? primary.values.map(v => cfg.barPosGood
+            ? (v >= 0 ? "rgba(63,115,82,.75)" : "rgba(185,92,51,.75)")
+            : (v >= 0 ? "rgba(138,87,49,.75)" : "rgba(63,115,82,.75)"))
         : (cfg.area && i === 0 ? gradientFill(canvas.getContext("2d"), C.accentSoft) : color),
       fill: cfg.area && i === 0, borderDash: spec.dash || [],
       borderWidth: cfg.bar ? 0 : (i === 0 ? 2.2 : 1.6),
@@ -538,6 +569,43 @@ function renderGauges() {
       </details>
     </div>`;
   }).join("");
+}
+
+/* ----------------------------------------------------------- playbook --- */
+function renderPlaybook() {
+  const pb = DATA.signals?.playbook;
+  const phaseEl = document.getElementById("phase-tracker");
+  const listEl = document.getElementById("checklist");
+  if (!pb || !phaseEl) {
+    if (phaseEl) phaseEl.innerHTML = "";
+    return;
+  }
+  const ph = pb.phase;
+  phaseEl.innerHTML = `
+    <div class="phase-card">
+      <div class="phase-bar">
+        ${ph.phases.map(p => `<div class="phase-seg${p.key === ph.key ? " active" : ""}">${esc(p.name)}</div>`).join("")}
+      </div>
+      <p class="phase-why"><b>${ph.checks_passing} of ${ph.checks_total}</b> confirmation checks passing · ${esc(ph.why)}</p>
+      <div class="phase-guide">
+        <div><h4>This phase's signature</h4><p>${esc(ph.guide.signature)}</p></div>
+        <div><h4>What has historically worked</h4><p>${esc(ph.guide.playbook)}</p></div>
+        <div><h4>The exit tell</h4><p>${esc(ph.guide.exit_tell)}</p></div>
+      </div>
+    </div>`;
+
+  const icons = { pass: "✓", warn: "!", fail: "✕" };
+  listEl.innerHTML = `<div class="check-grid">
+    ${pb.checks.map(c => `
+      <a class="check-item" href="${c.anchor ? "#" + c.anchor : "#playbook"}">
+        <div class="check-head">
+          <span class="check-icon ${c.state}">${icons[c.state] || "·"}</span>
+          <span class="check-label">${esc(c.label)}</span>
+        </div>
+        <div class="check-value">${esc(c.value)}</div>
+        <div class="check-note">${esc(c.note)}</div>
+      </a>`).join("")}
+  </div>`;
 }
 
 /* -------------------------------------------------------------- tiles --- */
@@ -711,6 +779,7 @@ function renderStatus() {
   renderRegime();
   renderGauges();
   renderTiles();
+  renderPlaybook();
   for (const cfg of CHARTS) renderCard(cfg);
   renderMajors();
   renderSectors();

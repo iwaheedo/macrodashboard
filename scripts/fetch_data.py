@@ -164,6 +164,8 @@ def build_crypto() -> dict:
                              prev, "btc_mvrv", "MVRV")
     realized = _fetch_or_salvage(lambda: S.bitcoin_data("realized-price"),
                                  prev, "btc_realized", "realized price")
+    sth_realized = _fetch_or_salvage(lambda: S.bitcoin_data("sth-realized-price"),
+                                     prev, "btc_sth_realized", "STH realized price")
 
     ma200d = sma(price, 200)
     ma200w = sma(price, 1400)  # 200 weeks on daily data
@@ -175,6 +177,35 @@ def build_crypto() -> dict:
 
     fng = S.fear_greed()
     stables = S.stablecoin_mcap()
+
+    # playbook inputs — each salvages the previous run's copy on failure
+    dex_vol = _fetch_or_salvage(S.defillama_dex_volumes, prev, "dex_volume", "DEX volumes")
+    tvl = _fetch_or_salvage(S.defillama_tvl, prev, "defi_tvl", "DeFi TVL")
+    etf = _fetch_or_salvage(S.sosovalue_etf_flows, prev, "etf_flows", "ETF flows")
+    if "cum" not in etf:  # salvaged copies carry it already; recompute if not
+        etf["cum"] = []
+    # BTC dominance proxy = BTC / (BTC + ETH + stablecoins), majors share.
+    # Understates the headline BTC.D level (long tail excluded) but tracks the
+    # same turning points; labeled as a proxy on the site.
+    try:
+        eth_mcap = S.coingecko_mcap_history("ethereum")
+        dom_d, dom_v = [], []
+        for dt, bm in zip(mcap["dates"], mcap["values"]):
+            if dt < eth_mcap["dates"][0]:
+                continue
+            em = value_asof(eth_mcap, dt)
+            sm = value_asof(stables, dt)
+            if em and sm:
+                dom_d.append(dt)
+                dom_v.append(bm / (bm + em + sm * 1e9) * 100.0)
+        dominance = series(dom_d, dom_v)
+    except Exception as e:
+        old = (prev.get("series") or {}).get("btc_dominance_proxy")
+        if old and old.get("values"):
+            print(f"  note: dominance proxy failed ({e}); reusing previous data")
+            dominance = {"dates": old["dates"], "values": old["values"]}
+        else:
+            raise
 
     spot = {}
     for coin, pair, hist in (("btc", "BTC-USD", price), ("eth", "ETH-USD", eth)):
@@ -225,6 +256,11 @@ def build_crypto() -> dict:
             "ethbtc": downsample_weekly(since(ethbtc, "2017-01-01"), ds),
             "fng": fng,
             "stablecoin_mcap": since(stables, "2019-01-01"),
+            "btc_sth_realized": since(sth_realized, "2019-01-01"),
+            "btc_dominance_proxy": dominance,
+            "dex_volume": since(dex_vol, "2020-01-01"),
+            "defi_tvl": since(tvl, "2020-01-01"),
+            "etf_flows": etf,
         },
     }
 
@@ -433,15 +469,39 @@ def build_signals(macro: dict, crypto: dict, derivs: dict, war: dict | None = No
     if derivs.get("long_short", {}).get("btc"):
         safe("long_short", I.read_long_short, derivs["long_short"]["btc"])
 
+    safe("sth_basis", I.read_sth_basis, cs["btc_price"], cs.get("btc_sth_realized") or {})
+    if cs.get("btc_dominance_proxy", {}).get("values"):
+        safe("dominance", I.read_dominance, cs["btc_dominance_proxy"],
+             crypto.get("spot", {}).get("btc_dominance"))
+    if cs.get("dex_volume", {}).get("values"):
+        safe("dex_volume", I.read_dex_volume, cs["dex_volume"])
+    if cs.get("defi_tvl", {}).get("values"):
+        safe("defi_tvl", I.read_tvl, cs["defi_tvl"])
+    if cs.get("etf_flows", {}).get("values"):
+        safe("etf_flows", I.read_etf_flows, cs["etf_flows"])
+
     liq = composites.liquidity_impulse(ms["net_liquidity"], ms["global_cb"], ms["m2_yoy"])
     risk = composites.risk_appetite(ms["vix"], ms["hy_oas"], ms["spx"], ms["spx_200dma"])
     cyc = composites.crypto_cycle(cs["btc_mvrv"], cs["btc_mayer"], cs["fng"],
                                   cs["btc_price"], cs["btc_200wma"])
     reg = composites.regime(liq, risk)
 
+    import playbook as P
+    try:
+        checks = P.build_checks(cs, derivs, crypto.get("spot", {}))
+        ath = max(cs["btc_price"]["values"])
+        phase = P.infer_phase(checks, cyc.get("score"), cs["btc_price"],
+                              last(cs["btc_price"]) / ath if ath else 0)
+        playbook = {"checks": checks, "phase": phase}
+    except Exception as e:
+        print(f"  note: playbook skipped ({e})")
+        playbook = None
+
     out = {"generated_at": now_iso(), "reads": reads,
            "gauges": {"liquidity_impulse": liq, "risk_appetite": risk,
                       "crypto_cycle": cyc, "regime": reg}}
+    if playbook:
+        out["playbook"] = playbook
     if war and war.get("divergence"):
         d = war["divergence"]
         out["war"] = {k: d.get(k) for k in ("state", "signal", "title",

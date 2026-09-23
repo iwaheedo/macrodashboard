@@ -117,7 +117,8 @@ def blockchain_chart(name: str, timespan: str = "all") -> dict:
     return series(dd, vv)
 
 
-BITCOIN_DATA_FIELDS = {"mvrv": "mvrv", "realized-price": "realizedPrice"}
+BITCOIN_DATA_FIELDS = {"mvrv": "mvrv", "realized-price": "realizedPrice",
+                       "sth-realized-price": "sthRealizedPrice"}
 
 
 def bitcoin_data(metric: str) -> dict:
@@ -222,6 +223,61 @@ def sector_performance(min_mcap: float = 2e9, n: int = 10) -> list[dict]:
         out.append({"name": c["name"][:40],
                     "chg24h": c["market_cap_change_24h"],
                     "mcap": c.get("market_cap")})
+    return out
+
+
+def coingecko_mcap_history(coin_id: str, days: int = 365) -> dict:
+    """Daily market cap for one coin (CoinGecko free tier caps at 365 days)."""
+    j = get_json(f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+                 f"?vs_currency=usd&days={days}&interval=daily", timeout=60)
+    d, v = [], []
+    for t, mc in j.get("market_caps", []):
+        if mc:
+            d.append(datetime.fromtimestamp(t / 1000, tz=timezone.utc).date().isoformat())
+            v.append(float(mc))
+    dd, vv = [], []
+    for dt, val in zip(d, v):
+        if dd and dd[-1] == dt:
+            vv[-1] = val
+        else:
+            dd.append(dt)
+            vv.append(val)
+    return series(dd, vv)
+
+
+def defillama_dex_volumes() -> dict:
+    """Total daily DEX volume across all chains, $B."""
+    j = get_json("https://api.llama.fi/overview/dexs"
+                 "?excludeTotalDataChart=false&excludeTotalDataChartBreakdown=true",
+                 timeout=60)
+    d, v = [], []
+    for t, vol in j.get("totalDataChart", []):
+        d.append(datetime.fromtimestamp(int(t), tz=timezone.utc).date().isoformat())
+        v.append(float(vol) / 1e9)
+    return series(d, v)
+
+
+def defillama_tvl() -> dict:
+    """Total DeFi TVL across all chains, $B."""
+    j = get_json("https://api.llama.fi/v2/historicalChainTvl", timeout=60)
+    d, v = [], []
+    for r in j:
+        d.append(datetime.fromtimestamp(int(r["date"]), tz=timezone.utc).date().isoformat())
+        v.append(float(r["tvl"]) / 1e9)
+    return series(d, v)
+
+
+def sosovalue_etf_flows() -> dict:
+    """US spot-BTC ETF daily net flows ($M) + cumulative ($B). Keyless POST."""
+    from net import post_json
+    j = post_json("https://api.sosovalue.xyz/openapi/v2/etf/historicalInflowChart",
+                  {"type": "us-btc-spot"}, timeout=60)
+    rows = sorted((r["date"], r) for r in j.get("data", []) if r.get("date"))
+    d = [dt for dt, _ in rows]
+    flows = [float(r.get("totalNetInflow") or 0) / 1e6 for _, r in rows]
+    cum = [float(r.get("cumNetInflow") or 0) / 1e9 for _, r in rows]
+    out = series(d, flows)
+    out["cum"] = [round(c, 2) for c in cum]
     return out
 
 

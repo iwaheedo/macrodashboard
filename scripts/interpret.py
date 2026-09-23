@@ -381,6 +381,80 @@ def read_long_short(s):
     return read(v, sig, f"{_fmt(v)} long accounts per short account on OKX: {verdict}.")
 
 
+def read_sth_basis(price_s, sth_s):
+    v = last(price_s)
+    if not sth_s or not sth_s.get("values"):
+        return read(v, "info", "")
+    sv = last(sth_s)
+    gap = (v / sv - 1) * 100
+    if gap > 35:
+        sig, verdict = "caution", "recent buyers sit on big fast profits — sharp shakeouts get more likely"
+    elif gap > 0:
+        sig, verdict = "good", "recent buyers are in profit, so dips tend to get bought — healthy bull structure"
+    else:
+        sig, verdict = "caution", "the average recent buyer is underwater — overhead supply caps rallies until this flips"
+    return read(v, sig, f"BTC trades {gap:+.0f}% vs the short-term holder cost basis (${_fmt(sv, 0)}): {verdict}.")
+
+
+def read_dominance(dom_s, official=None):
+    v = last(dom_s)
+    low120 = min(dom_s["values"][-120:]) if len(dom_s["values"]) >= 120 else min(dom_s["values"])
+    off = v - low120
+    ch30 = change_over(dom_s, 30)
+    official_txt = f" (headline BTC.D: {official:.1f}%)" if official else ""
+    if off > 1 and (ch30 or 0) > 0:
+        sig, verdict = "good", "capital is favoring Bitcoin first — the classic early-bull pattern before rotation broadens"
+    elif (ch30 or 0) < -1:
+        sig, verdict = "info", "dominance is falling — either alt rotation (mid/late bull) or BTC-specific weakness; check which"
+    else:
+        sig, verdict = "neutral", "no decisive rotation signal"
+    return read(v, sig, f"BTC's share of majors is {_fmt(v, 1)}%{official_txt}, {'+' if off >= 0 else ''}{_fmt(off, 1)}pp off its 120-day low: {verdict}.")
+
+
+def read_dex_volume(s):
+    v = last(s)
+    recent = sum(s["values"][-30:]) / 30
+    base = sum(s["values"][-210:-30]) / 180 if len(s["values"]) > 210 else None
+    if base:
+        chg = (recent / base - 1) * 100
+        if chg > 25:
+            sig, verdict = "good", "on-chain trading is accelerating — real usage confirming the price move"
+        elif chg > -10:
+            sig, verdict = "neutral", "activity is steady — not confirming, not contradicting"
+        else:
+            sig, verdict = "caution", "activity is fading — a rally without usage is running on thin fuel"
+        return read(v, sig, f"DEX volume averages ${_fmt(recent, 1)}B/day ({chg:+.0f}% vs the prior 6 months): {verdict}.")
+    return read(v, "info", f"DEX volume is ${_fmt(v, 1)}B/day.")
+
+
+def read_tvl(s):
+    v = last(s)
+    ch90 = pct_change_over(s, 90)
+    if ch90 is None:
+        return read(v, "info", f"DeFi TVL is ${_fmt(v, 0)}B.")
+    if ch90 > 10:
+        sig, verdict = "good", "capital is being redeployed into DeFi — the credit rebuild that powers wealth-creation phases"
+    elif ch90 > -5:
+        sig, verdict = "neutral", "DeFi capital is stable"
+    else:
+        sig, verdict = "caution", "capital is leaving DeFi — risk appetite inside crypto is contracting"
+    return read(v, sig, f"DeFi TVL is ${_fmt(v, 0)}B ({ch90:+.0f}% in 90 days): {verdict}.")
+
+
+def read_etf_flows(s):
+    last7 = sum(s["values"][-7:])
+    last30 = sum(s["values"][-30:])
+    cum = s.get("cum", [])
+    cum_txt = f" (cumulative ${cum[-1]:,.0f}B since launch)" if cum else ""
+    if last7 > 0 and last30 > 0:
+        sig, verdict = "good", "the institutional pipe is net-buying — structural demand under the market"
+    elif last30 > 0:
+        sig, verdict = "neutral", "flows are choppy week-to-week but still positive over the month"
+    else:
+        sig, verdict = "caution", "institutions are net sellers — the marginal big buyer is missing"
+    return read(last7, sig, f"Spot-BTC ETFs: {last7:+,.0f}M over 7 days, {last30:+,.0f}M over 30{cum_txt}: {verdict}.")
+
+
 # -------------------------------------------------------- war-risk reads ---
 
 def read_chokepoint(label: str, dev_pct: float | None, ma14: float | None,

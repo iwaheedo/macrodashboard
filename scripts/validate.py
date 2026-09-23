@@ -49,6 +49,11 @@ CRYPTO_RULES = {
     "fng": (4, 0.0, 100.0),
     "stablecoin_mcap": (6, 50.0, 3000.0),    # $B
     "btc_hashrate": (7, 1e7, 1e12),          # TH-scale, wide
+    "btc_sth_realized": (14, 5000.0, 500_000.0),
+    "btc_dominance_proxy": (5, 40.0, 95.0),  # majors-share proxy, %
+    "dex_volume": (5, 0.5, 500.0),           # $B/day
+    "defi_tvl": (5, 20.0, 3000.0),           # $B
+    "etf_flows": (6, -20_000.0, 20_000.0),   # $M/day net
 }
 
 
@@ -128,6 +133,15 @@ def validate() -> Problems:
             problems.check(score is not None and 0 <= score <= 100,
                            f"signals.json: gauge {name} score invalid ({score})")
         problems.check(bool(g.get("regime", {}).get("name")), "signals.json: regime missing")
+        pb = signals.get("playbook") or {}
+        problems.check(len(pb.get("checks", [])) >= 6,
+                       f"signals.json: playbook has {len(pb.get('checks', []))} checks (expected ≥6)")
+        problems.check(pb.get("phase", {}).get("key") in
+                       ("early_bull", "wealth_creation", "wealth_distribution", "wealth_destruction"),
+                       f"signals.json: bad playbook phase '{pb.get('phase', {}).get('key')}'")
+        for c in pb.get("checks", []):
+            problems.check(c.get("state") in ("pass", "warn", "fail", "na"),
+                           f"signals.json: check {c.get('id')} bad state '{c.get('state')}'")
 
     derivs = _load("derivs.json", problems)
     if derivs is not None and derivs:

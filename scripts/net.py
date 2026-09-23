@@ -57,5 +57,32 @@ def get_json(url: str, **kw):
     return json.loads(get(url, **kw).decode("utf-8"))
 
 
+def post_json(url: str, payload: dict, *, timeout: int = DEFAULT_TIMEOUT,
+              retries: int = DEFAULT_RETRIES) -> dict:
+    """POST a JSON body, return parsed JSON. Same retry policy as get()."""
+    body = json.dumps(payload).encode("utf-8")
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(
+                url, data=body, method="POST",
+                headers={"User-Agent": UA, "Content-Type": "application/json",
+                         "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = resp.read()
+                if resp.headers.get("Content-Encoding") == "gzip":
+                    data = gzip.GzipFile(fileobj=io.BytesIO(data)).read()
+                return json.loads(data.decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code not in (408, 429, 500, 502, 503, 504):
+                break
+        except Exception as e:
+            last_err = e
+        if attempt < retries - 1:
+            time.sleep(2.0 * (2 ** attempt) + random.uniform(0, 1))
+    raise FetchError(f"POST {url} failed: {last_err}") from last_err
+
+
 def get_text(url: str, **kw) -> str:
     return get(url, **kw).decode("utf-8", errors="replace")

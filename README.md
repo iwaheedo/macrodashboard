@@ -62,6 +62,19 @@ python3 -m http.server 8741 --directory site   # view at localhost:8741
 
 No dependencies — pure Python 3.10+ stdlib.
 
+## Bull-Market Playbook (top of `index.html`)
+
+A cycle-phase tracker and live confirmation checklist following the framework
+The DeFi Report (Michael Nadeau & Ryan Sean Adams) discusses on their weekly
+show — four phases: Early Bull → Wealth Creation → Wealth Distribution →
+Wealth Destruction. Attribution is shown on the page; all thresholds,
+computations and text are this repo's own (`scripts/playbook.py`), computed
+from free public data. Checks: golden cross, 50-week reclaim (with weekly-close
+streak), 200-day hold, price vs STH cost basis, dominance turning up,
+stablecoin rebuild, leverage rebuild, DEX-volume inflection, spot-ETF flows.
+New data: bitcoin-data.com STH realized price, CoinGecko ETH mcap (dominance
+proxy), DefiLlama DEX volumes + TVL, SoSoValue ETF flows (keyless POST).
+
 ## War Risk page (`war.html`)
 
 Theater playbooks (Iran/Hormuz, Red Sea, Russia–Ukraine, Taiwan), a
