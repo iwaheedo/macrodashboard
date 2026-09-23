@@ -102,14 +102,34 @@ real traffic — the page says so wherever it matters.
 
 ## Security
 
-- **No secrets exist** in this system — no API keys, no tokens beyond the
-  workflow's own scoped `GITHUB_TOKEN`. Nothing to leak or rotate.
-- Static site, no backend, no user input, no cookies, no analytics.
-- CSP meta on both pages; the only external asset (Chart.js, pinned 4.4.9) is
-  loaded with an SRI integrity hash from jsdelivr.
-- All externally-sourced strings (news titles, calendar rows) are HTML-escaped
-  before rendering.
-- Workflows use only official `actions/*` steps.
+Threat model: (a) someone attacking the owner via the site/repo, (b) any of
+the ~15 free data sources getting compromised. Defenses, all tested in
+`tests/test_security.py`:
+
+- **No secrets exist** — no API keys, no tokens beyond the workflow's scoped
+  `GITHUB_TOKEN`. Nothing to leak or rotate. Static site: no backend, no user
+  input, no cookies, no analytics, no localStorage.
+- **Zero third-party runtime code:** Chart.js is vendored into
+  `site/vendor/` (integrity-verified at vendoring time); CSP is
+  `script-src 'self'` with `object-src`/`frame-src`/`base-uri`/`form-action`
+  all locked down. No CDN in the trust surface.
+- **Hostile-source containment (pipeline):** every externally-sourced string
+  is tag-stripped, control-char-stripped and length-capped (`clean_str`);
+  links must match a strict `https://` pattern (`safe_url`) or are dropped —
+  a compromised RSS feed cannot plant `javascript:`/`data:` links; numbers
+  are type-coerced (`_num`); calendar impact values are enum-coerced. The
+  client additionally re-checks URL schemes and HTML-escapes everything.
+- **Network hardening:** HTTPS only, redirects that leave HTTPS are refused,
+  responses are size-capped (64MB raw / 256MB decompressed), FRED zip members
+  are size-checked before extraction (zip-bomb guard), RSS feeds capped at
+  8MB before XML parsing.
+- **Supply-chain (CI):** all workflow actions pinned to full commit SHAs;
+  repo Actions policy restricted to GitHub-authored actions only; `ci.yml`
+  token is read-only; data pushes use the default scoped `GITHUB_TOKEN`.
+- **Validation as tripwire:** `validate.py` fails the run (and opens an
+  alert issue) if any published news link is non-HTTPS or any series value
+  leaves its plausibility range — a poisoned source gets caught before deploy.
+- Local preview server binds `127.0.0.1` only.
 
 ## Maintenance (designed to be near zero)
 

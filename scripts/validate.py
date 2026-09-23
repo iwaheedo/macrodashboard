@@ -152,6 +152,9 @@ def validate() -> Problems:
     if newscal:
         problems.check(len(newscal.get("news", [])) >= 5,
                        f"newscal.json: only {len(newscal.get('news', []))} news items")
+        for n in newscal.get("news", []):
+            problems.check(str(n.get("link", "")).startswith("https://"),
+                           f"newscal.json: non-https news link ({str(n.get('link'))[:60]})")
 
     war = _load("war.json", problems)
     if war:
@@ -177,6 +180,9 @@ def validate() -> Problems:
         problems.check(div.get("state") in ("disruption_underpriced", "disruption_priced",
                                             "premium_no_disruption", "aligned", "unknown"),
                        f"war.json: bad divergence state '{div.get('state')}'")
+        for n in war.get("news", []):
+            problems.check(str(n.get("link", "")).startswith("https://"),
+                           f"war.json: non-https news link ({str(n.get('link'))[:60]})")
 
     meta = _load("meta.json", problems)
     if meta:

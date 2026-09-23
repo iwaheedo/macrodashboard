@@ -56,11 +56,16 @@ def _fred_one(ids: list[str], start: str | None) -> dict[str, dict]:
     if raw[:4] == b"PK\x03\x04":
         # FRED zips large downloads and may split series across several CSVs
         # (one per frequency/aggregation) plus a README — parse every CSV.
+        # Member sizes are checked before extraction (zip-bomb guard).
         import zipfile
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
-            for name in z.namelist():
-                if name.lower().endswith(".csv"):
-                    texts.append(z.read(name).decode("utf-8", errors="replace"))
+            for info in z.infolist():
+                if not info.filename.lower().endswith(".csv"):
+                    continue
+                if info.file_size > 200 * 1024 * 1024:
+                    raise FetchError(f"FRED zip member {info.filename} implausibly "
+                                     f"large ({info.file_size} bytes) — refusing")
+                texts.append(z.read(info).decode("utf-8", errors="replace"))
     else:
         texts.append(raw.decode("utf-8", errors="replace"))
 
@@ -194,14 +199,14 @@ def top_coins(n: int = 10) -> list[dict]:
                  f"?vs_currency=usd&order=market_cap_desc&per_page={n}&page=1"
                  "&price_change_percentage=24h,7d")
     out = []
-    for c in j:
+    for c in j[:n]:
         out.append({
-            "symbol": (c.get("symbol") or "").upper(),
-            "name": c.get("name") or "",
-            "price": c.get("current_price"),
-            "mcap": c.get("market_cap"),
-            "chg24h": c.get("price_change_percentage_24h_in_currency"),
-            "chg7d": c.get("price_change_percentage_7d_in_currency"),
+            "symbol": clean_str((c.get("symbol") or "").upper(), 12),
+            "name": clean_str(c.get("name") or "", 40),
+            "price": _num(c.get("current_price")),
+            "mcap": _num(c.get("market_cap")),
+            "chg24h": _num(c.get("price_change_percentage_24h_in_currency")),
+            "chg7d": _num(c.get("price_change_percentage_7d_in_currency")),
         })
     return out
 
@@ -209,20 +214,21 @@ def top_coins(n: int = 10) -> list[dict]:
 def sector_performance(min_mcap: float = 2e9, n: int = 10) -> list[dict]:
     """Crypto sector (category) 24h performance from CoinGecko."""
     j = get_json("https://api.coingecko.com/api/v3/coins/categories")
-    rows = [c for c in j
-            if (c.get("market_cap") or 0) >= min_mcap
-            and c.get("market_cap_change_24h") is not None
-            and c.get("name")]
-    rows.sort(key=lambda c: c["market_cap_change_24h"], reverse=True)
+    rows = []
+    for c in j:
+        mcap = _num(c.get("market_cap"))
+        chg = _num(c.get("market_cap_change_24h"))
+        name = clean_str(c.get("name") or "", 40)
+        if mcap is not None and mcap >= min_mcap and chg is not None and name:
+            rows.append({"name": name, "chg24h": chg, "mcap": mcap})
+    rows.sort(key=lambda c: c["chg24h"], reverse=True)
     picked = rows[:n // 2] + rows[-(n - n // 2):] if len(rows) > n else rows
     seen, out = set(), []
     for c in picked:
         if c["name"] in seen:
             continue
         seen.add(c["name"])
-        out.append({"name": c["name"][:40],
-                    "chg24h": c["market_cap_change_24h"],
-                    "mcap": c.get("market_cap")})
+        out.append(c)
     return out
 
 
@@ -525,14 +531,15 @@ def portwatch_chokepoint(portid: str, since: str = "2023-01-01") -> dict:
 def econ_calendar() -> list[dict]:
     j = get_json("https://nfs.faireconomy.media/ff_calendar_thisweek.json")
     out = []
-    for r in j:
+    for r in j[:200]:
+        impact = clean_str(r.get("impact", ""), 20)
         out.append({
-            "title": r.get("title", ""),
-            "country": r.get("country", ""),
-            "date": r.get("date", ""),
-            "impact": r.get("impact", ""),
-            "forecast": r.get("forecast", ""),
-            "previous": r.get("previous", ""),
+            "title": clean_str(r.get("title", ""), 120),
+            "country": clean_str(r.get("country", ""), 8),
+            "date": clean_str(r.get("date", ""), 40),
+            "impact": impact if impact in ("High", "Medium", "Low", "Holiday") else "Low",
+            "forecast": clean_str(r.get("forecast", ""), 24),
+            "previous": clean_str(r.get("previous", ""), 24),
         })
     return out
 
@@ -563,14 +570,48 @@ WAR_KEYWORDS = [
 ]
 
 _TAG_RE = re.compile(r"<[^>]+>")
+_CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def clean_str(s, max_len: int = 200) -> str:
+    """Sanitize an externally-sourced string before it ships to the site:
+    strip tags, control characters, and cap the length. The site additionally
+    HTML-escapes everything at render time — this is defense in depth."""
+    if not isinstance(s, str):
+        return ""
+    s = html.unescape(_TAG_RE.sub("", s))
+    return _CTRL_RE.sub("", s).strip()[:max_len]
+
+
+def safe_url(u) -> str:
+    """Allow only plain https URLs (no javascript:, data:, file: — a
+    compromised feed must not be able to plant a scriptable link)."""
+    if not isinstance(u, str):
+        return ""
+    u = u.strip()
+    if re.fullmatch(r"https://[^\s<>\"']+", u) and len(u) <= 500:
+        return u
+    return ""
+
+
+def _num(x):
+    """Coerce an externally-sourced value to float, else None."""
+    try:
+        v = float(x)
+        return v if v == v and abs(v) != float("inf") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_feed(source: str, kind: str, url: str, max_items: int) -> list[dict]:
     items = []
-    root = ET.fromstring(get(url).decode("utf-8", errors="replace"))
+    raw = get(url)
+    if len(raw) > 8 * 1024 * 1024:
+        raise FetchError(f"feed {source} implausibly large — refusing to parse")
+    root = ET.fromstring(raw.decode("utf-8", errors="replace"))
     for item in root.iter("item"):
-        title = html.unescape(_TAG_RE.sub("", (item.findtext("title") or "").strip()))
-        link = (item.findtext("link") or "").strip()
+        title = clean_str(item.findtext("title") or "")
+        link = safe_url(item.findtext("link") or "")
         pub = (item.findtext("pubDate") or "").strip()
         iso = ""
         if pub:
@@ -579,7 +620,7 @@ def _parse_feed(source: str, kind: str, url: str, max_items: int) -> list[dict]:
             except Exception:
                 pass
         if title and link:
-            items.append({"title": title[:200], "link": link, "source": source,
+            items.append({"title": title, "link": link, "source": source,
                           "kind": kind, "published": iso})
         if len(items) >= max_items:
             break

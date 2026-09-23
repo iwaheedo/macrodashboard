@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <title>War Risk — Waypoint</title>
 <meta name="description" content="Conflict theaters, their market transmission channels, and a physical-flows-vs-price tracker for the world's oil chokepoints.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%238A5731'/><path d='M28 72 V48 M50 72 V28 M72 72 V38' stroke='white' stroke-width='10' stroke-linecap='round'/></svg>">
@@ -100,7 +100,7 @@
   <div class="foot-status" id="foot-status"></div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" integrity="sha384-b0GXujLkk9eYYSmcSfoyZbfyElGAQnDyY0skCHSG6w3JgTMFnz11ggrTAr7seu9f" crossorigin="anonymous"></script>
+<script src="vendor/chart.umd.min.js"></script>
 <script src="war.js"></script>
 </body>
 </html>

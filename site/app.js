@@ -375,6 +375,9 @@ function nowBox(read) {
 }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+/* belt-and-braces: the pipeline already drops non-https links, but never
+   render an attacker-controllable URL into href without checking the scheme */
+function safeUrl(u) { return typeof u === "string" && /^https:\/\//.test(u) ? u : "#"; }
 
 function explainBlock(id) {
   const e = EXPLAINERS[id];
@@ -724,7 +727,7 @@ function renderWeek() {
       <p class="card-sub">Latest macro &amp; crypto headlines from public feeds</p></div></div>
     <div class="rowlist">${news.slice(0, 14).map(n => `
       <div class="rowitem"><span class="impact-dot" style="background:${n.kind === "macro" ? C.camel : C.accent}"></span>
-        <span><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a>
+        <span><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>
         <div class="row-meta">${esc(n.source)} · ${relTime(n.published)}</div></span></div>`).join("")}</div>
     <div class="card-foot"><span>Headlines link to the original source</span><span>RSS</span></div>`;
   grid.appendChild(newsEl);
@@ -760,8 +763,10 @@ function renderStatus() {
   } else {
     txt.textContent = `Updated ${relTime(gen)}`;
   }
+  const badNames = Object.entries(DATA.meta?.sources || {})
+    .filter(([, s]) => s && s.ok === false).map(([k]) => k);
   document.getElementById("foot-status").textContent =
-    `Pipeline last ran ${relTime(gen)}` + (bad.length ? ` · degraded: ${bad.map(([k]) => k).join(", ")}` : "");
+    `Pipeline last ran ${relTime(gen)}` + (badNames.length ? ` · degraded: ${badNames.join(", ")}` : "");
   document.getElementById("repo-link").href = REPO_URL;
 }
 

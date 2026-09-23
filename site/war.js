@@ -17,6 +17,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const tickLabel = iso => MONTHS[+iso.slice(5, 7) - 1] + " ’" + iso.slice(2, 4);
 const fullDate = iso => MONTHS[+iso.slice(5, 7) - 1] + " " + (+iso.slice(8, 10)) + ", " + iso.slice(0, 4);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const safeUrl = u => (typeof u === "string" && /^https:\/\//.test(u) ? u : "#");
 function relTime(iso) {
   const t = new Date(iso).getTime();
   if (!isFinite(t)) return "";
@@ -284,7 +285,7 @@ function renderWarNews() {
   el.innerHTML = `
     <div class="rowlist">${news.length ? news.map(n => `
       <div class="rowitem"><span class="impact-dot" style="background:${n.kind === "maritime" ? C.camel : C.warn}"></span>
-        <span><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a>
+        <span><a href="${esc(safeUrl(n.link))}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>
         <div class="row-meta">${esc(n.source)} · ${relTime(n.published)}</div></span></div>`).join("")
       : '<div class="rowitem">War wire unavailable — auto-retries on next refresh.</div>'}</div>
     <div class="card-foot"><span>Filtered for conflict &amp; chokepoint relevance; links go to the original source</span><span>Al Jazeera · BBC · gCaptain · market feeds</span></div>`;
