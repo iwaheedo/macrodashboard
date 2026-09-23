@@ -1,12 +1,9 @@
 """The Bull-Market Playbook: a live confirmation checklist and cycle-phase
-tracker following the framework The DeFi Report (Michael Nadeau & Ryan Sean
-Adams) uses on their weekly show — four phases: Early Bull, Wealth Creation,
-Wealth Distribution, Wealth Destruction.
+tracker built on a four-phase view of crypto cycles: Early Bull, Wealth
+Creation, Wealth Distribution, Wealth Destruction.
 
-Attribution: the *framework and indicator selection* follow TDR's public
-podcast discussion (TDR podcast, Sep 2026 episodes). All thresholds,
-computations and text here are Waypoint's own, computed from free public data.
-This is educational context, not investment advice.
+All thresholds, computations and text are Waypoint's own, computed from free
+public data. Educational context, not investment advice.
 
 Every check returns:
   {id, label, state, value, note, anchor}
@@ -79,7 +76,7 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
     else:
         val = f"50d {'above' if above else 'below'} 200d" + (f" for {days}d" if days else "")
         note = ("The medium-term trend has turned up through the long-term trend — "
-                "the classic trend-change confirmation TDR waits for."
+                "the classic confirmation that the trend has actually changed."
                 if above else
                 "No golden cross yet — the trend change is unconfirmed.")
         checks.append(_check("golden_cross", "Golden cross (50d > 200d)",
@@ -93,9 +90,9 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
         val = (f"${px:,.0f} vs ${m350:,.0f} · {streak} weekly close{'s' if streak != 1 else ''} above"
                if above_50w else f"${px:,.0f} below ${m350:,.0f}")
         if above_50w and streak >= 3:
-            st, note = "pass", "Price has held above the 50-week line for several weekly closes — TDR's bar for a confirmed regime change."
+            st, note = "pass", "Price has held above the 50-week line for several weekly closes — the bar for calling the regime change confirmed."
         elif above_50w:
-            st, note = "warn", "Price is above the 50-week line but TDR wants a few weekly closes above it before calling it confirmed — a retest of this line is normal."
+            st, note = "warn", "Price is above the 50-week line but confirmation wants a few weekly closes above it — a retest of this line is normal."
         else:
             st, note = "fail", "Below the 50-week moving average — bear-market structure until reclaimed."
         checks.append(_check("ma_50w", "Reclaim the 50-week average", st, val, note, "card-btc"))
@@ -117,7 +114,7 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
         st = "pass" if px > sv else "fail"
         checks.append(_check("sth_basis", "New money in profit (price > STH cost basis)",
                              st, f"${px:,.0f} vs ${sv:,.0f}",
-                             "Recent buyers are in profit, so dips find buyers — the market-structure foundation TDR's cohort work tracks." if st == "pass"
+                             "Recent buyers are in profit, so dips find buyers — the market-structure foundation of a durable bull." if st == "pass"
                              else "Recent buyers are underwater — rallies get sold by trapped holders until this flips.",
                              "card-costbasis"))
 
@@ -129,7 +126,7 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
         chg30 = (pct_change_over(dom, 30) or 0)
         off_low = cur - low120
         if off_low > 1.0 and chg30 > 0:
-            st, note = "pass", "BTC dominance has turned up off its cycle low — the pattern TDR associates with the start of an early bull (BTC leads first)."
+            st, note = "pass", "BTC dominance has turned up off its cycle low — the classic early-bull pattern: BTC leads first."
         elif off_low > 0.3:
             st, note = "warn", "Dominance is stabilizing near its low — watch for a clear upturn."
         else:
@@ -146,7 +143,7 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
             st = "pass" if chg90 > 2 else ("warn" if chg90 > -1 else "fail")
             checks.append(_check("stables", "Stablecoin supply rebuilding",
                                  st, f"${last(stables):,.0f}B ({chg90:+.1f}% / 90d)",
-                                 "Fresh dollars are entering crypto — TDR treats this as the market's own money supply expanding." if st == "pass"
+                                 "Fresh dollars are entering crypto — the market's own money supply expanding." if st == "pass"
                                  else "No new dollars yet — the wealth-creation fuel tank isn't filling.",
                                  "card-stables"))
 
@@ -180,7 +177,7 @@ def build_checks(cs: dict, derivs: dict, spot: dict) -> list[dict]:
         st = "pass" if chg > 15 else ("warn" if chg > -10 else "fail")
         checks.append(_check("onchain", "On-chain activity inflecting",
                              st, f"DEX vol ${recent:.1f}B/day ({chg:+.0f}% vs 6m base)",
-                             "Real usage is picking up with price — the reflexive loop TDR wants to see behind a rally." if st == "pass"
+                             "Real usage is picking up with price — the reflexive loop a quality rally needs behind it." if st == "pass"
                              else "Activity isn't confirming the move yet — rallies without usage are lower quality.",
                              "card-dex"))
 
@@ -209,7 +206,7 @@ PHASES = [
 PHASE_GUIDE = {
     "early_bull": {
         "signature": "Trend reclaimed (golden cross, 50-week), BTC leads and dominance rises, recent buyers back in profit, first pockets of speculation return while the crowd is still skeptical.",
-        "playbook": "Historically the phase where patient positioning in majors and high-conviction themes paid best — accumulation into strength, wide stops, no chasing. TDR's framing: build positions before the crowd believes it.",
+        "playbook": "Historically the phase where patient positioning in majors and high-conviction themes paid best — accumulation into strength, wide stops, no chasing. The edge is building positions before the crowd believes it.",
         "exit_tell": "Graduates into Wealth Creation when stablecoins, credit and on-chain activity expand together and price approaches old highs.",
     },
     "wealth_creation": {
@@ -219,7 +216,7 @@ PHASE_GUIDE = {
     },
     "wealth_distribution": {
         "signature": "Price still elevated but coins transfer from smart money to late buyers at high cost bases; speculative pockets have already peaked; breadth narrows while headlines peak.",
-        "playbook": "The phase for selling into strength and cutting the long tail — TDR's own discipline last cycle was going risk-off months before the top, at peak speculation.",
+        "playbook": "The phase for selling into strength and cutting the long tail — The discipline that worked last cycle was going risk-off months before the top, at peak speculation.",
         "exit_tell": "Rolls into Wealth Destruction when the 200-day fails and recent buyers go underwater en masse.",
     },
     "wealth_destruction": {

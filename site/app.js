@@ -234,7 +234,7 @@ const CHARTS = [
     read: "oil", ranges: ["1Y", "3Y", "10Y"], def: "3Y",
     series: [{ f: "macro", k: "oil", label: "WTI crude" }], source: "FRED (DCOILWTICO)" },
 
-  // -------- playbook (TDR-framework charts)
+  // -------- playbook (cycle-framework charts)
   { id: "costbasis", section: "playbook", title: "The Cost-Basis Ladder", full: true,
     sub: "Price vs the market's average cost basis and what recent buyers paid — the market-structure view", unit: fmt.usd,
     read: ["sth_basis", "realized"], ranges: ["1Y", "3Y", "All"], def: "3Y", legend: true,

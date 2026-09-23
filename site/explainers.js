@@ -124,7 +124,7 @@ const EXPLAINERS = {
     down: "Falling usage during a rally → price is moving on leverage and thin participation; treat the move with more suspicion.",
   },
   costbasis: {
-    what: "Bitcoin against the market's cost-basis ladder: the realized price (what the average coin was last bought for) and the short-term holder (STH) cost basis (what recent buyers paid). This is the market-structure view The DeFi Report's cohort analysis is built on — who is in profit, and by how much.",
+    what: "Bitcoin against the market's cost-basis ladder: the realized price (what the average coin was last bought for) and the short-term holder (STH) cost basis (what recent buyers paid). This is the market-structure view — who is in profit, and by how much.",
     up: "Price pulling far above both lines → everyone is in profit, and eventually that profit becomes selling pressure. A moderate premium over the STH line is what a healthy bull looks like.",
     down: "Losing the STH line traps recent buyers and turns rallies into exits; losing the realized price is full capitulation — historically where cycle bottoms formed.",
   },

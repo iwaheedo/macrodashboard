@@ -301,15 +301,6 @@ table.majors td .sym { color: var(--ink-3); font-weight: 500; font-size: 12.5px;
 .sectorbar .bval { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ----------------------------------------------------------- playbook --- */
-.attr-note {
-  background: linear-gradient(180deg, #FFFFFF 0%, #FDFBF7 100%);
-  border: 1px solid var(--line); border-left: 4px solid var(--accent);
-  border-radius: 16px; padding: 16px 20px; margin-bottom: 20px;
-  font-size: 14px; line-height: 1.6; color: var(--ink-2);
-}
-.attr-note a { color: var(--accent); text-decoration: none; }
-.attr-note a:hover { text-decoration: underline; }
-
 .phase-card {
   background: var(--card); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
